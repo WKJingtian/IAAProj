@@ -1,0 +1,15 @@
+{
+  "uri": "mongodb://127.0.0.1:27017",
+  "database": "iaa",
+  "user": "",
+  "pwd": "",
+  "app_name": "iaa-service",
+  "max_pool_size": 300,
+  "min_pool_size": 20,
+  "max_connecting": 32,
+  "max_conn_idle_ms": 120000,
+  "connect_timeout_ms": 5000,
+  "server_selection_timeout_ms": 5000,
+  "socket_timeout_ms": 30000,
+  "ping_timeout_ms": 3000
+}

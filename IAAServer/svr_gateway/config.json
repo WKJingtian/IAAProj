@@ -1,0 +1,11 @@
+{
+  "gateway_port": 80,
+  "login_host": "127.0.0.1",
+  "login_port": 8080,
+  "game_host": "127.0.0.1",
+  "game_port": 8081,
+  "jwt_secret": "",
+  "proxy_timeout_ms": 10000,
+  "login_route_path": "/login",
+  "login_target_path": "/wxlogin"
+}

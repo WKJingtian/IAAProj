@@ -5,16 +5,24 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
+	"time"
+
+	"common/config"
+	"github.com/golang-jwt/jwt/v5"
 )
 
-// 配置项：小游戏AppID和AppSecret（请替换为实际值）
-const (
-	WXAppID     = "wx735dd8b2e0fda8fe"
-	WXAppSecret = "ed909b959713aef0ce156f3131175ead"
-	ServerPort  = ":80" // 监听80端口
-)
+const defaultConfigPath = "config.json"
 
-// 微信接口返回的结构体
+type ServerConfig struct {
+	WXAppID     string `json:"wx_app_id"`
+	WXAppSecret string `json:"wx_app_secret"`
+	LoginPort   int    `json:"login_port"`
+	JWTSecret   string `json:"jwt_secret"`
+}
+
+var appConfig ServerConfig
+
 type WxCode2SessionResp struct {
 	OpenID     string `json:"openid"`
 	SessionKey string `json:"session_key"`
@@ -22,107 +30,143 @@ type WxCode2SessionResp struct {
 	ErrCode    int    `json:"errcode"`
 	ErrMsg     string `json:"errmsg"`
 }
+
 type TestResp struct {
 	TestRespContentHeader string `json:"content"`
 }
 
-// 给Unity返回的结构体
 type LoginResp struct {
 	OpenID string `json:"openid"`
+	Token  string `json:"token"`
 	ErrMsg string `json:"errMsg"`
 }
 
+func loadServerConfig(path string) (ServerConfig, error) {
+	var cfg ServerConfig
+	if err := config.LoadJSONConfig(path, &cfg); err != nil {
+		return ServerConfig{}, err
+	}
+
+	if strings.TrimSpace(cfg.WXAppID) == "" {
+		return ServerConfig{}, fmt.Errorf("wx_app_id cannot be empty")
+	}
+	if strings.TrimSpace(cfg.WXAppSecret) == "" {
+		return ServerConfig{}, fmt.Errorf("wx_app_secret cannot be empty")
+	}
+	if strings.TrimSpace(cfg.JWTSecret) == "" {
+		return ServerConfig{}, fmt.Errorf("jwt_secret cannot be empty")
+	}
+	if cfg.LoginPort <= 0 || cfg.LoginPort > 65535 {
+		return ServerConfig{}, fmt.Errorf("login_port must be in range 1-65535")
+	}
+
+	return cfg, nil
+}
+
+func generateJWT(openid string, secret string) (string, error) {
+	claims := jwt.MapClaims{
+		"openid": openid,
+		"exp":    time.Now().Add(7 * 24 * time.Hour).Unix(),
+		"iat":    time.Now().Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(secret))
+}
+
 func testHandler(w http.ResponseWriter, r *http.Request) {
-	// 设置跨域头
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(TestResp{TestRespContentHeader: r.Method})
-	return
+	_ = json.NewEncoder(w).Encode(TestResp{TestRespContentHeader: r.Method})
 }
 
-// 核心登录接口：/wxlogin
 func wxLoginHandler(w http.ResponseWriter, r *http.Request) {
-	// 设置跨域头
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
 
-	// 处理OPTIONS预检请求
-	if r.Method == "OPTIONS" {
+	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	// 只接受POST请求
-	if r.Method != "POST" {
-		json.NewEncoder(w).Encode(LoginResp{ErrMsg: "仅支持POST请求"})
+	if r.Method != http.MethodPost {
+		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: "Only support POST request"})
 		return
 	}
 
-	// 解析表单参数
 	if err := r.ParseForm(); err != nil {
-		json.NewEncoder(w).Encode(LoginResp{ErrMsg: "解析参数失败：" + err.Error()})
+		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: "Fail to parse args: " + err.Error()})
 		return
 	}
 
 	code := r.PostForm.Get("code")
 	appid := r.PostForm.Get("appid")
 
-	// 校验参数
 	if code == "" {
-		json.NewEncoder(w).Encode(LoginResp{ErrMsg: "code不能为空"})
+		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: "code cannot be empty"})
 		return
 	}
-	if appid != WXAppID {
-		json.NewEncoder(w).Encode(LoginResp{ErrMsg: fmt.Sprintf("AppID错误: incoming app id -> %s", appid)})
+	if appid != appConfig.WXAppID {
+		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: fmt.Sprintf("AppID error: incoming app id -> %s", appid)})
 		return
 	}
 
-	// 调用微信接口换取openid
-	wxUrl := fmt.Sprintf(
+	wxURL := fmt.Sprintf(
 		"https://api.weixin.qq.com/sns/jscode2session?appid=%s&secret=%s&js_code=%s&grant_type=authorization_code",
-		url.QueryEscape(WXAppID),
-		url.QueryEscape(WXAppSecret),
+		url.QueryEscape(appConfig.WXAppID),
+		url.QueryEscape(appConfig.WXAppSecret),
 		url.QueryEscape(code),
 	)
 
-	wxResp, err := http.Get(wxUrl)
+	wxResp, err := http.Get(wxURL)
 	if err != nil {
-		json.NewEncoder(w).Encode(LoginResp{ErrMsg: "调用微信接口失败：" + err.Error()})
+		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: "Fail to fetch WX URL: " + err.Error()})
 		return
 	}
 	defer wxResp.Body.Close()
 
-	// 解析微信返回的JSON
 	var wxResult WxCode2SessionResp
 	if err := json.NewDecoder(wxResp.Body).Decode(&wxResult); err != nil {
-		json.NewEncoder(w).Encode(LoginResp{ErrMsg: "解析微信返回数据失败：" + err.Error()})
+		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: "Fail to parse json from WX server: " + err.Error()})
 		return
 	}
 
-	// 处理微信接口业务错误
 	if wxResult.ErrCode != 0 {
-		json.NewEncoder(w).Encode(LoginResp{ErrMsg: fmt.Sprintf("微信接口错误：%d - %s", wxResult.ErrCode, wxResult.ErrMsg)})
+		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: fmt.Sprintf("WX API error: %d - %s", wxResult.ErrCode, wxResult.ErrMsg)})
 		return
 	}
 
-	// 成功返回openid
-	json.NewEncoder(w).Encode(LoginResp{
+	token, err := generateJWT(wxResult.OpenID, appConfig.JWTSecret)
+	if err != nil {
+		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: "internal error. JWT generation failed."})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(LoginResp{
 		OpenID: wxResult.OpenID,
+		Token:  token,
 		ErrMsg: "",
 	})
 }
 
 func main() {
+	cfg, err := loadServerConfig(defaultConfigPath)
+	if err != nil {
+		fmt.Printf("load config failed: %s\n", err.Error())
+		return
+	}
+	appConfig = cfg
+	listenAddr := fmt.Sprintf(":%d", appConfig.LoginPort)
+
 	http.HandleFunc("/wxlogin", wxLoginHandler)
 	http.HandleFunc("/test", testHandler)
-	fmt.Printf("服务器启动成功！监听地址：http://0.0.0.0%s\n", ServerPort)
-	if err := http.ListenAndServe(ServerPort, nil); err != nil {
-		fmt.Printf("服务器启动失败：%s\n", err.Error())
+	fmt.Printf("login server start, will listen to: http://0.0.0.0%s\n", listenAddr)
+	if err := http.ListenAndServe(listenAddr, nil); err != nil {
+		fmt.Printf("server init failed: %s\n", err.Error())
 	}
 }

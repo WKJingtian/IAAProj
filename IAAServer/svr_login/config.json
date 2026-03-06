@@ -1,0 +1,6 @@
+{
+  "login_port": 8080,
+  "wx_app_id": "wx735dd8b2e0fda8fe",
+  "wx_app_secret": "ed909b959713aef0ce156f3131175ead",
+  "jwt_secret": "2wEmusTKi1LA11JewS0"
+}
