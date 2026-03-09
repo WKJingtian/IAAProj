@@ -3,6 +3,8 @@
   "database": "iaa_game_db",
   "user": "admin",
   "pwd": "chilly123-",
+  "auth_source": "iaa_game_db",
+  "auth_mechanism": "SCRAM-SHA-256",
   "app_name": "svr_game",
   "max_pool_size": 300,
   "min_pool_size": 20,

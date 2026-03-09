@@ -3,6 +3,8 @@
   "database": "iaa",
   "user": "",
   "pwd": "",
+  "auth_source": "",
+  "auth_mechanism": "",
   "app_name": "iaa-service",
   "max_pool_size": 300,
   "min_pool_size": 20,

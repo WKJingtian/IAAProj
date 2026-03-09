@@ -1,3 +1,4 @@
 {
-  "game_port": 8081
+  "game_port": 8081,
+  "main_collection": "usr_data"
 }

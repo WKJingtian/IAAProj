@@ -12,7 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"common/applog"
 	"common/config"
+
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -135,6 +137,7 @@ func newGatewayServer(cfg GatewayConfig) (*GatewayServer, error) {
 }
 
 func proxyErrorHandler(w http.ResponseWriter, _ *http.Request, err error) {
+	applog.Errorf("proxy upstream failed: %v", err)
 	writeJSON(w, http.StatusBadGateway, APIResp{ErrMsg: "proxy upstream failed: " + err.Error()})
 }
 
@@ -222,12 +225,14 @@ func (g *GatewayServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	token, err := extractBearerToken(r)
 	if err != nil {
+		applog.Errorf("auth failed: %v", err)
 		writeJSON(w, http.StatusUnauthorized, APIResp{ErrMsg: err.Error()})
 		return
 	}
 
 	openid, err := parseOpenIDFromJWT(token, g.cfg.JWTSecret)
 	if err != nil {
+		applog.Errorf("jwt verify failed: %v", err)
 		writeJSON(w, http.StatusUnauthorized, APIResp{ErrMsg: "JWT verify failed: " + err.Error()})
 		return
 	}
@@ -240,9 +245,20 @@ func (g *GatewayServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	if err := applog.Init("svr_gateway"); err != nil {
+		fmt.Printf("init logger failed: %s\n", err.Error())
+	}
+	defer func() {
+		if err := applog.Close(); err != nil {
+			fmt.Printf("close logger failed: %s\n", err.Error())
+		}
+	}()
+	defer applog.CatchPanic()
+
 	cfg, err := loadGatewayConfig(gatewayConfigPath)
 	if err != nil {
-		fmt.Printf("load gateway config failed: %s\n", err.Error())
+		applog.Errorf("load gateway config failed: %v", err)
+		time.Sleep(1000000)
 		return
 	}
 
@@ -250,12 +266,13 @@ func main() {
 
 	server, err := newGatewayServer(cfg)
 	if err != nil {
-		fmt.Printf("init gateway failed: %s\n", err.Error())
+		applog.Errorf("init gateway failed: %v", err)
+		time.Sleep(1000000)
 		return
 	}
 
-	fmt.Printf("svr_gateway start, will listen to: http://0.0.0.0%s\n", listenAddr)
+	applog.Infof("svr_gateway start, will listen to: http://0.0.0.0%s", listenAddr)
 	if err := http.ListenAndServe(listenAddr, server); err != nil {
-		fmt.Printf("gateway init failed: %s\n", err.Error())
+		applog.Errorf("gateway init failed: %v", err)
 	}
 }

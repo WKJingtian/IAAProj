@@ -8,7 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"common/applog"
 	"common/config"
+
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -95,11 +97,13 @@ func wxLoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method != http.MethodPost {
+		applog.Errorf("invalid method for /wxlogin: %s", r.Method)
 		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: "Only support POST request"})
 		return
 	}
 
 	if err := r.ParseForm(); err != nil {
+		applog.Errorf("parse form failed: %v", err)
 		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: "Fail to parse args: " + err.Error()})
 		return
 	}
@@ -108,10 +112,12 @@ func wxLoginHandler(w http.ResponseWriter, r *http.Request) {
 	appid := r.PostForm.Get("appid")
 
 	if code == "" {
+		applog.Errorf("wxlogin request missing code")
 		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: "code cannot be empty"})
 		return
 	}
 	if appid != appConfig.WXAppID {
+		applog.Errorf("appid mismatch: incoming=%s", appid)
 		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: fmt.Sprintf("AppID error: incoming app id -> %s", appid)})
 		return
 	}
@@ -125,6 +131,7 @@ func wxLoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	wxResp, err := http.Get(wxURL)
 	if err != nil {
+		applog.Errorf("fetch wx url failed: %v", err)
 		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: "Fail to fetch WX URL: " + err.Error()})
 		return
 	}
@@ -132,17 +139,20 @@ func wxLoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	var wxResult WxCode2SessionResp
 	if err := json.NewDecoder(wxResp.Body).Decode(&wxResult); err != nil {
+		applog.Errorf("decode wx response failed: %v", err)
 		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: "Fail to parse json from WX server: " + err.Error()})
 		return
 	}
 
 	if wxResult.ErrCode != 0 {
+		applog.Errorf("wx api returned error: errcode=%d errmsg=%s", wxResult.ErrCode, wxResult.ErrMsg)
 		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: fmt.Sprintf("WX API error: %d - %s", wxResult.ErrCode, wxResult.ErrMsg)})
 		return
 	}
 
 	token, err := generateJWT(wxResult.OpenID, appConfig.JWTSecret)
 	if err != nil {
+		applog.Errorf("jwt generation failed: %v", err)
 		_ = json.NewEncoder(w).Encode(LoginResp{ErrMsg: "internal error. JWT generation failed."})
 		return
 	}
@@ -155,9 +165,20 @@ func wxLoginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	if err := applog.Init("svr_login"); err != nil {
+		fmt.Printf("init logger failed: %s\n", err.Error())
+	}
+	defer func() {
+		if err := applog.Close(); err != nil {
+			fmt.Printf("close logger failed: %s\n", err.Error())
+		}
+	}()
+	defer applog.CatchPanic()
+
 	cfg, err := loadServerConfig(defaultConfigPath)
 	if err != nil {
-		fmt.Printf("load config failed: %s\n", err.Error())
+		applog.Errorf("load config failed: %v", err)
+		time.Sleep(1000000)
 		return
 	}
 	appConfig = cfg
@@ -165,8 +186,8 @@ func main() {
 
 	http.HandleFunc("/wxlogin", wxLoginHandler)
 	http.HandleFunc("/test", testHandler)
-	fmt.Printf("login server start, will listen to: http://0.0.0.0%s\n", listenAddr)
+	applog.Infof("login server start, will listen to: http://0.0.0.0%s", listenAddr)
 	if err := http.ListenAndServe(listenAddr, nil); err != nil {
-		fmt.Printf("server init failed: %s\n", err.Error())
+		applog.Errorf("server init failed: %v", err)
 	}
 }

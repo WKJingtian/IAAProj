@@ -4,7 +4,7 @@
   "login_port": 8080,
   "game_host": "127.0.0.1",
   "game_port": 8081,
-  "jwt_secret": "",
+  "jwt_secret": "2wEmusTKi1LA11JewS0",
   "proxy_timeout_ms": 10000,
   "login_route_path": "/login",
   "login_target_path": "/wxlogin"

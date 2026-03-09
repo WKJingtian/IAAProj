@@ -33,3 +33,6 @@ func main() {
 
 Copy from `config.example.json` and adjust values for your environment.
 If authentication is required, fill both `user` and `pwd` (they must be provided together).
+If auth fails due SCRAM negotiation, set:
+- `auth_source` (usually `admin` or your user database)
+- `auth_mechanism` (recommended `SCRAM-SHA-256` on modern MongoDB)

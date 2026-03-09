@@ -3,13 +3,19 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	"common/applog"
 	"common/config"
 	cmongo "common/mongo"
+
+	"go.mongodb.org/mongo-driver/bson"
+	driverMongo "go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const (
@@ -18,13 +24,24 @@ const (
 )
 
 type AppConfig struct {
-	GamePort int `json:"game_port"`
+	GamePort       int    `json:"game_port"`
+	MainCollection string "main_collection"
 }
 
 type APIResp struct {
-	Method string `json:"method,omitempty"`
-	ErrMsg string `json:"errMsg"`
+	OpenID   string `json:"openid,omitempty"`
+	DebugVal int64  `json:"debug_val,omitempty"`
+	ErrMsg   string `json:"errMsg"`
 }
+
+type PlayerDoc struct {
+	OpenID    string    `bson:"openid"`
+	DebugVal  int64     `bson:"debug_val"`
+	CreatedAt time.Time `bson:"created_at,omitempty"`
+	UpdatedAt time.Time `bson:"updated_at,omitempty"`
+}
+
+var defaultCollectionName string = ""
 
 func loadAppConfig(path string) (AppConfig, error) {
 	var cfg AppConfig
@@ -40,7 +57,7 @@ func loadAppConfig(path string) (AppConfig, error) {
 
 func setCommonHeaders(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, PATCH")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-OpenID")
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
 }
@@ -51,56 +68,192 @@ func writeJSON(w http.ResponseWriter, status int, resp APIResp) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-func requestHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodOptions {
-		setCommonHeaders(w)
-		w.WriteHeader(http.StatusOK)
-		return
+func handleOptions(w http.ResponseWriter, r *http.Request) bool {
+	if r.Method != http.MethodOptions {
+		return false
 	}
+	setCommonHeaders(w)
+	w.WriteHeader(http.StatusOK)
+	return true
+}
 
+func extractOpenID(r *http.Request) (string, error) {
 	openid := strings.TrimSpace(r.Header.Get("X-OpenID"))
 	if openid == "" {
-		writeJSON(w, http.StatusUnauthorized, APIResp{ErrMsg: "missing X-OpenID header"})
-		return
+		return "", errors.New("missing X-OpenID header")
 	}
+	return openid, nil
+}
 
+func getPlayersCollection() (*driverMongo.Collection, error) {
 	db, err := cmongo.Database()
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, APIResp{ErrMsg: "get mongo database failed: " + err.Error()})
+		return nil, err
+	}
+	return db.Collection(defaultCollectionName), nil
+}
+
+func ensurePlayerIndexes(ctx context.Context) error {
+	coll, err := getPlayersCollection()
+	if err != nil {
+		return err
+	}
+
+	indexCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	_, err = coll.Indexes().CreateOne(indexCtx, driverMongo.IndexModel{
+		Keys: bson.D{{Key: "openid", Value: 1}},
+		Options: options.Index().
+			SetName("idx_openid_unique").
+			SetUnique(true),
+	})
+	if err != nil {
+		return fmt.Errorf("create player index failed: %w", err)
+	}
+	return nil
+}
+
+func debugValHandler(w http.ResponseWriter, r *http.Request) {
+	if handleOptions(w, r) {
+		return
+	}
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, APIResp{ErrMsg: "Only support GET request"})
 		return
 	}
 
-	insertCtx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	openid, err := extractOpenID(r)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, APIResp{ErrMsg: err.Error()})
+		return
+	}
+
+	coll, err := getPlayersCollection()
+	if err != nil {
+		applog.Errorf("get players collection failed(debug_val): %v", err)
+		writeJSON(w, http.StatusInternalServerError, APIResp{ErrMsg: "get players collection failed: " + err.Error()})
+		return
+	}
+
+	queryCtx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 
-	_, err = db.Collection("request_logs").InsertOne(insertCtx, map[string]any{
-		"method":     r.Method,
-		"path":       r.URL.Path,
-		"openid":     openid,
-		"created_at": time.Now().UTC(),
-	})
+	var doc PlayerDoc
+	err = coll.FindOne(queryCtx, bson.M{"openid": openid}).Decode(&doc)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, APIResp{ErrMsg: "insert request log failed: " + err.Error()})
+		if errors.Is(err, driverMongo.ErrNoDocuments) {
+			writeJSON(w, http.StatusOK, APIResp{
+				OpenID:   openid,
+				DebugVal: 0,
+				ErrMsg:   "",
+			})
+			return
+		}
+		applog.Errorf("query debug_val failed, openid=%s: %v", openid, err)
+		writeJSON(w, http.StatusInternalServerError, APIResp{ErrMsg: "query debug_val failed: " + err.Error()})
 		return
 	}
 
 	writeJSON(w, http.StatusOK, APIResp{
-		Method: r.Method,
-		ErrMsg: "",
+		OpenID:   openid,
+		DebugVal: doc.DebugVal,
+		ErrMsg:   "",
 	})
 }
 
-func main() {
-	cfg, err := loadAppConfig(appConfigPath)
-	if err != nil {
-		fmt.Printf("load app config failed: %s\n", err.Error())
+func debugValIncHandler(w http.ResponseWriter, r *http.Request) {
+	if handleOptions(w, r) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, APIResp{ErrMsg: "Only support POST request"})
 		return
 	}
 
+	openid, err := extractOpenID(r)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, APIResp{ErrMsg: err.Error()})
+		return
+	}
+
+	coll, err := getPlayersCollection()
+	if err != nil {
+		applog.Errorf("get players collection failed(debug_val_inc): %v", err)
+		writeJSON(w, http.StatusInternalServerError, APIResp{ErrMsg: "get players collection failed: " + err.Error()})
+		return
+	}
+
+	now := time.Now().UTC()
+	update := bson.M{
+		"$inc": bson.M{
+			"debug_val": 1,
+		},
+		"$set": bson.M{
+			"updated_at": now,
+		},
+		"$setOnInsert": bson.M{
+			"openid":     openid,
+			"created_at": now,
+		},
+	}
+
+	updateCtx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+
+	var doc PlayerDoc
+	err = coll.FindOneAndUpdate(
+		updateCtx,
+		bson.M{"openid": openid},
+		update,
+		options.FindOneAndUpdate().
+			SetUpsert(true).
+			SetReturnDocument(options.After),
+	).Decode(&doc)
+	if err != nil {
+		applog.Errorf("increment debug_val failed, openid=%s: %v", openid, err)
+		writeJSON(w, http.StatusInternalServerError, APIResp{ErrMsg: "increment debug_val failed: " + err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, APIResp{
+		OpenID:   openid,
+		DebugVal: doc.DebugVal,
+		ErrMsg:   "",
+	})
+}
+
+func notFoundHandler(w http.ResponseWriter, r *http.Request) {
+	if handleOptions(w, r) {
+		return
+	}
+	writeJSON(w, http.StatusNotFound, APIResp{ErrMsg: "route not found"})
+}
+
+func main() {
+	if err := applog.Init("svr_game"); err != nil {
+		fmt.Printf("init logger failed: %s\n", err.Error())
+	}
+	defer func() {
+		if err := applog.Close(); err != nil {
+			fmt.Printf("close logger failed: %s\n", err.Error())
+		}
+	}()
+	defer applog.CatchPanic()
+
+	cfg, err := loadAppConfig(appConfigPath)
+	if err != nil {
+		applog.Errorf("load app config failed: %v", err)
+		time.Sleep(1000000)
+		return
+	}
+
+	defaultCollectionName = cfg.MainCollection
 	listenAddr := fmt.Sprintf(":%d", cfg.GamePort)
 
 	if _, err := cmongo.InitFromJSON(context.Background(), mongoConfigPath); err != nil {
-		fmt.Printf("init mongo failed: %s\n", err.Error())
+		applog.Errorf("init mongo failed: %v", err)
+		time.Sleep(1000000)
 		return
 	}
 	defer func() {
@@ -109,9 +262,19 @@ func main() {
 		_ = cmongo.Disconnect(ctx)
 	}()
 
-	http.HandleFunc("/", requestHandler)
-	fmt.Printf("svr_game start, will listen to: http://0.0.0.0%s\n", listenAddr)
-	if err := http.ListenAndServe(listenAddr, nil); err != nil {
-		fmt.Printf("server init failed: %s\n", err.Error())
+	if err := ensurePlayerIndexes(context.Background()); err != nil {
+		applog.Errorf("ensure player indexes failed: %v", err)
+		time.Sleep(1000000)
+		return
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug_val", debugValHandler)
+	mux.HandleFunc("/debug_val_inc", debugValIncHandler)
+	mux.HandleFunc("/", notFoundHandler)
+
+	applog.Infof("svr_game start, will listen to: http://0.0.0.0%s", listenAddr)
+	if err := http.ListenAndServe(listenAddr, mux); err != nil {
+		applog.Errorf("server init failed: %v", err)
 	}
 }
