@@ -1,6 +1,12 @@
 {
-  "login_port": 8080,
-  "wx_app_id": "wx735dd8b2e0fda8fe",
-  "wx_app_secret": "ed909b959713aef0ce156f3131175ead",
-  "jwt_secret": "2wEmusTKi1LA11JewS0"
+  "login_port": 8081,
+  "wx_app_id": "wx5cb84ac8c2524663",
+  "wx_app_secret": "7596ef616a41801907374f995a5994ec",
+  "jwt_secret": "2wEmusTKi1LA11JewS0",
+  "gateway_host": "127.0.0.1",
+  "gateway_port": 8080,
+  "gateway_register_path": "/register",
+  "gateway_heartbeat_path": "/heartbeat",
+  "report_ip": "127.0.0.1",
+  "server_id": "login-1"
 }

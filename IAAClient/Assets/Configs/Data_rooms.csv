@@ -1,0 +1,6 @@
+﻿id,furnitures,prefab
+0,"[0,1,2,3]",Prefabs/Rooms/room_1.prefab
+1,"[4,5,6,7]",Prefabs/Rooms/room_2.prefab
+2,"[8,9,10,11]",Prefabs/Rooms/room_3.prefab
+3,"[12,13,14,15]",Prefabs/Rooms/room_4.prefab
+4,"[16,17,18,19]",Prefabs/Rooms/room_5.prefab

@@ -1,0 +1,30 @@
+﻿key,en_EN,zh_CN
+error_0,OK means the request succeeded and no error is present.,OK means the request succeeded and no error is present.
+error_1,InternalError is used for unexpected server-side failures.,InternalError is used for unexpected server-side failures.
+error_2,InvalidMethod means the HTTP method is not allowed for the route.,InvalidMethod means the HTTP method is not allowed for the route.
+error_3,InvalidRequest means the request shape is invalid but no more specific code exists.,InvalidRequest means the request shape is invalid but no more specific code exists.
+error_4,Unauthorized means the caller is not authenticated or not allowed to access the route.,Unauthorized means the caller is not authenticated or not allowed to access the route.
+error_5,RouteNotFound means the requested route does not exist.,RouteNotFound means the requested route does not exist.
+error_6,UpstreamUnavailable means gateway could not find a healthy upstream service.,UpstreamUnavailable means gateway could not find a healthy upstream service.
+error_7,UpstreamProxyFailed means gateway failed while proxying to the upstream service.,UpstreamProxyFailed means gateway failed while proxying to the upstream service.
+error_100,AuthMissingHeader means the auth header or forwarded identity header is missing.,AuthMissingHeader means the auth header or forwarded identity header is missing.
+error_101,AuthInvalidBearer means the Authorization header is not a Bearer token.,AuthInvalidBearer means the Authorization header is not a Bearer token.
+error_102,AuthEmptyBearerToken means the Bearer token exists but is empty.,AuthEmptyBearerToken means the Bearer token exists but is empty.
+error_103,AuthInvalidToken means JWT verification failed or claims are invalid.,AuthInvalidToken means JWT verification failed or claims are invalid.
+error_104,AuthMissingOpenID means the token or forwarded request is missing openid identity.,AuthMissingOpenID means the token or forwarded request is missing openid identity.
+error_120,LoginCodeEmpty means the login request is missing the WeChat code.,LoginCodeEmpty means the login request is missing the WeChat code.
+error_121,LoginAppIDMismatch means the client appid does not match server config.,LoginAppIDMismatch means the client appid does not match server config.
+error_122,LoginWXRequestFailed means the server failed to call the WeChat login API.,LoginWXRequestFailed means the server failed to call the WeChat login API.
+error_123,LoginWXResponseInvalid means the WeChat login API response could not be parsed.,LoginWXResponseInvalid means the WeChat login API response could not be parsed.
+error_124,LoginWXAPIError means the WeChat login API returned an application-level error.,LoginWXAPIError means the WeChat login API returned an application-level error.
+error_125,LoginJWTGenerationFailed means JWT generation failed after login succeeded.,LoginJWTGenerationFailed means JWT generation failed after login succeeded.
+error_200,TriggerEventPayloadInvalid means the trigger_event request body is malformed.,TriggerEventPayloadInvalid means the trigger_event request body is malformed.
+error_201,TriggerEventMultiplierInvalid means multiplier is invalid.,TriggerEventMultiplierInvalid means multiplier is invalid.
+error_202,TriggerEventInsufficientEnergy means the player lacks enough energy to trigger the event.,TriggerEventInsufficientEnergy means the player lacks enough energy to trigger the event.
+error_300,UpgradeFurniturePayloadInvalid means the upgrade_furniture request body is malformed.,UpgradeFurniturePayloadInvalid means the upgrade_furniture request body is malformed.
+error_301,UpgradeFurnitureFurnitureIDRequired means furniture_id is missing.,UpgradeFurnitureFurnitureIDRequired means furniture_id is missing.
+error_302,UpgradeFurnitureFurnitureIDInvalid means furniture_id is negative or otherwise invalid.,UpgradeFurnitureFurnitureIDInvalid means furniture_id is negative or otherwise invalid.
+error_303,UpgradeFurnitureFurnitureNotFound means the furniture id does not exist.,UpgradeFurnitureFurnitureNotFound means the furniture id does not exist.
+error_304,UpgradeFurnitureFurnitureNotInCurrentRoom means the furniture is not in the player's current room.,UpgradeFurnitureFurnitureNotInCurrentRoom means the furniture is not in the player's current room.
+error_305,UpgradeFurnitureFurnitureMaxLevel means the furniture is already at max level.,UpgradeFurnitureFurnitureMaxLevel means the furniture is already at max level.
+error_306,UpgradeFurnitureInsufficientCash means the player lacks enough cash to upgrade furniture.,UpgradeFurnitureInsufficientCash means the player lacks enough cash to upgrade furniture.

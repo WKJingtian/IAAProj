@@ -1,0 +1,12 @@
+﻿key,value
+event_cost,1.0
+cash_max,100000000.0
+shield_max,100.0
+energy_max,24.0
+max_event_history,200.0
+start_energy,24.0
+energy_recover_time,3600.0
+pirate_target_min_level,1.0
+pirate_blocked_event_id,135.0
+pirate_hit_event_id,136.0
+pirate_hit_cash_loss_percent,0.02

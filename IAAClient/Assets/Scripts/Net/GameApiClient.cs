@@ -1,93 +1,79 @@
 using System;
-using System.Collections;
-using UnityEngine;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
 using UnityEngine.Networking;
 
 public class GameApiClient
 {
-    [Serializable]
-    public class DebugValResponse
-    {
-        public string openid;
-        public int debug_val;
-        public string errMsg;
-    }
-
     private readonly string _gatewayBaseUrl;
 
     public GameApiClient(string gatewayBaseUrl)
     {
-        _gatewayBaseUrl = NormalizeBaseUrl(gatewayBaseUrl);
+        _gatewayBaseUrl = gatewayBaseUrl.TrimEnd('/');
     }
 
-    public IEnumerator GetDebugVal(string token, Action<DebugValResponse> onSuccess, Action<string> onFailed)
+    public async Task<TResponse> SendAuthorizedRequestAsync<TResponse>(NetAPI<TResponse> api, string token)
+        where TResponse : NetResponseBase
     {
-        yield return SendAuthorizedRequest("GET", "/debug_val", token, onSuccess, onFailed);
+        return await SendAuthorizedRequestAsync(api, token, null);
     }
 
-    public IEnumerator IncrementDebugVal(string token, Action<DebugValResponse> onSuccess, Action<string> onFailed)
+    public async Task<TResponse> SendAuthorizedRequestAsync<TResponse>(NetAPI<TResponse> api, string token, object requestBody)
+        where TResponse : NetResponseBase
     {
-        yield return SendAuthorizedRequest("POST", "/debug_val_inc", token, onSuccess, onFailed);
-    }
-
-    private IEnumerator SendAuthorizedRequest(string method, string path, string token, Action<DebugValResponse> onSuccess, Action<string> onFailed)
-    {
-        if (string.IsNullOrEmpty(token))
-        {
-            onFailed?.Invoke("token cannot be empty");
-            yield break;
-        }
-
-        string url = _gatewayBaseUrl + path;
-        using (UnityWebRequest request = new UnityWebRequest(url, method))
+        string url = _gatewayBaseUrl + api.requestPath;
+        using (UnityWebRequest request = new UnityWebRequest(url, api.Method))
         {
             request.downloadHandler = new DownloadHandlerBuffer();
-            request.uploadHandler = new UploadHandlerRaw(new byte[0]);
+            byte[] payloadBytes = BuildRequestBody(requestBody);
+            request.uploadHandler = new UploadHandlerRaw(payloadBytes);
             request.SetRequestHeader("Authorization", "Bearer " + token);
             request.SetRequestHeader("Content-Type", "application/json");
 
-            yield return request.SendWebRequest();
-
-            if (request.result != UnityWebRequest.Result.Success)
+            UnityWebRequestAsyncOperation operation = request.SendWebRequest();
+            while (!operation.isDone)
             {
-                string responseBody = request.downloadHandler != null ? request.downloadHandler.text : "";
-                onFailed?.Invoke("request failed: " + request.error + ", body=" + responseBody);
-                yield break;
+                await Task.Yield();
             }
 
             string body = request.downloadHandler.text;
-            DebugValResponse response;
+            TResponse response;
             try
             {
-                response = JsonUtility.FromJson<DebugValResponse>(body);
+                response = JsonConvert.DeserializeObject<TResponse>(body);
             }
             catch (Exception ex)
             {
-                onFailed?.Invoke("parse debug response failed: " + ex.Message + ", body=" + body);
-                yield break;
+                throw new AppErrorException(ErrorCode.CLIENT_RESPONSE_PARSE_FAILED, ex);
             }
 
             if (response == null)
             {
-                onFailed?.Invoke("debug response is null");
-                yield break;
-            }
-            if (!string.IsNullOrEmpty(response.errMsg))
-            {
-                onFailed?.Invoke(response.errMsg);
-                yield break;
+                throw new AppErrorException(ErrorCode.CLIENT_RESPONSE_INVALID);
             }
 
-            onSuccess?.Invoke(response);
+            if (response.ErrMsg != ErrorCode.OK)
+            {
+                throw new AppErrorException(response.ErrMsg);
+            }
+
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                throw new AppErrorException(ErrorCode.CLIENT_REQUEST_FAILED);
+            }
+
+            return response;
         }
     }
 
-    private static string NormalizeBaseUrl(string baseUrl)
+    private static byte[] BuildRequestBody(object requestBody)
     {
-        if (string.IsNullOrEmpty(baseUrl))
+        if (requestBody == null)
         {
-            return "";
+            return Array.Empty<byte>();
         }
-        return baseUrl.TrimEnd('/');
+
+        string json = JsonConvert.SerializeObject(requestBody);
+        return System.Text.Encoding.UTF8.GetBytes(json);
     }
 }

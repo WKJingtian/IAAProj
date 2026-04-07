@@ -1,5 +1,6 @@
 using System;
-using System.Collections;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -9,93 +10,78 @@ public class GatewayAuthClient
     private readonly string _wxAppId;
 
     [Serializable]
-    private class LoginResponse
+    private class LoginResponse : NetResponseBase
     {
-        public string openid;
-        public string token;
-        public string errMsg;
+        [JsonProperty("openid",
+            Required = Required.Default,
+            NullValueHandling = NullValueHandling.Ignore)]
+        public string OpenID;
+
+        [JsonProperty("token",
+            Required = Required.Default,
+            NullValueHandling = NullValueHandling.Ignore)]
+        public string Token;
     }
 
     public GatewayAuthClient(string gatewayBaseUrl, string wxAppId)
     {
-        _gatewayBaseUrl = NormalizeBaseUrl(gatewayBaseUrl);
+        _gatewayBaseUrl = gatewayBaseUrl.TrimEnd('/');
         _wxAppId = wxAppId;
     }
 
-    public IEnumerator LoginWithCode(string code, Action<AuthSession> onSuccess, Action<string> onFailed)
+    // send code to our server, returns the user-specific open-ID and a JWT for future authentication on our server
+    public async Task<AuthSession> LoginWithCodeAsync(string code)
     {
-        if (string.IsNullOrEmpty(code))
-        {
-            onFailed?.Invoke("login code cannot be empty");
-            yield break;
-        }
-        if (string.IsNullOrEmpty(_wxAppId))
-        {
-            onFailed?.Invoke("WX_APP_ID cannot be empty");
-            yield break;
-        }
-
-        string loginUrl = _gatewayBaseUrl + "/login";
+        string loginUrl = _gatewayBaseUrl + Consts.GatewayLoginPath;
         WWWForm form = new WWWForm();
         form.AddField("code", code);
         form.AddField("appid", _wxAppId);
 
         using (UnityWebRequest request = UnityWebRequest.Post(loginUrl, form))
         {
-            yield return request.SendWebRequest();
-
-            if (request.result != UnityWebRequest.Result.Success)
+            UnityWebRequestAsyncOperation operation = request.SendWebRequest();
+            while (!operation.isDone)
             {
-                onFailed?.Invoke("gateway login request failed: " + request.error);
-                yield break;
+                await Task.Yield();
             }
 
             string body = request.downloadHandler.text;
             LoginResponse response;
             try
             {
-                response = JsonUtility.FromJson<LoginResponse>(body);
+                response = JsonConvert.DeserializeObject<LoginResponse>(body);
             }
             catch (Exception ex)
             {
-                onFailed?.Invoke("parse login response failed: " + ex.Message + ", body=" + body);
-                yield break;
+                throw new AppErrorException(ErrorCode.CLIENT_RESPONSE_PARSE_FAILED, ex);
             }
 
             if (response == null)
             {
-                onFailed?.Invoke("login response is null");
-                yield break;
+                throw new AppErrorException(ErrorCode.CLIENT_RESPONSE_INVALID);
+            }
+            if (response.ErrMsg != ErrorCode.OK)
+            {
+                throw new AppErrorException(response.ErrMsg);
             }
 
-            if (!string.IsNullOrEmpty(response.errMsg))
+            if (request.result != UnityWebRequest.Result.Success)
             {
-                onFailed?.Invoke(response.errMsg);
-                yield break;
+                throw new AppErrorException(ErrorCode.CLIENT_REQUEST_FAILED);
             }
 
             AuthSession session = new AuthSession
             {
-                openid = response.openid,
-                token = response.token
+                openid = response.OpenID,
+                token = response.Token
             };
 
             if (!session.IsValid)
             {
-                onFailed?.Invoke("login response missing openid or token");
-                yield break;
+                throw new AppErrorException(ErrorCode.CLIENT_LOGIN_RESPONSE_INVALID);
             }
 
-            onSuccess?.Invoke(session);
+            return session;
         }
-    }
-
-    private static string NormalizeBaseUrl(string baseUrl)
-    {
-        if (string.IsNullOrEmpty(baseUrl))
-        {
-            return "";
-        }
-        return baseUrl.TrimEnd('/');
     }
 }

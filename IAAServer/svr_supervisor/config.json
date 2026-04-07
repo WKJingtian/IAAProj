@@ -1,0 +1,10 @@
+{
+  "control_host": "127.0.0.1",
+  "control_port": 19090,
+  "runtime_root": "./linux_runtime",
+  "health_host": "127.0.0.1",
+  "health_check_interval_sec": 3,
+  "health_failure_threshold": 3,
+  "restart_backoff_sec": 2,
+  "default_game_service_id": "game-1"
+}

@@ -12,6 +12,11 @@ import (
 	"sync"
 )
 
+const (
+	logPathEnv       = "APP_LOG_PATH"
+	logStdoutOnlyEnv = "APP_LOG_STDOUT_ONLY"
+)
+
 var (
 	mu      sync.Mutex
 	name    = "app"
@@ -50,11 +55,30 @@ func InitWithPath(serviceName string, fileName string) error {
 		trimmedFile = "log.txt"
 	}
 
-	baseDir, err := executableDir()
-	if err != nil {
-		baseDir = "."
+	if stdoutOnlyEnabled() {
+		mu.Lock()
+		oldFile := logFile
+		name = trimmedName
+		logPath = ""
+		logFile = nil
+		logger.SetOutput(os.Stdout)
+		logger.SetFlags(log.LstdFlags | log.Lmicroseconds)
+		log.SetOutput(os.Stdout)
+		log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+		mu.Unlock()
+
+		if oldFile != nil {
+			_ = oldFile.Close()
+		}
+
+		Infof("logger initialized: stdout only")
+		return nil
 	}
-	fullPath := filepath.Join(baseDir, trimmedFile)
+
+	fullPath, err := resolveLogPath(trimmedFile)
+	if err != nil {
+		return fmt.Errorf("resolve log path failed: %w", err)
+	}
 
 	f, err := os.OpenFile(fullPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
@@ -146,4 +170,25 @@ func executableDir() (string, error) {
 		return "", errors.New("empty executable dir")
 	}
 	return dir, nil
+}
+
+func resolveLogPath(defaultFileName string) (string, error) {
+	if overridden := strings.TrimSpace(os.Getenv(logPathEnv)); overridden != "" {
+		return overridden, nil
+	}
+
+	baseDir, err := executableDir()
+	if err != nil {
+		baseDir = "."
+	}
+	return filepath.Join(baseDir, defaultFileName), nil
+}
+
+func stdoutOnlyEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(logStdoutOnlyEnv))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }

@@ -1,0 +1,6 @@
+<linker>
+  <assembly fullname="Assembly-CSharp">
+    <type fullname="MainPageUI" preserve="all" />
+  </assembly>
+  <assembly fullname="YooAsset.MiniGame" preserve="all" />
+</linker>

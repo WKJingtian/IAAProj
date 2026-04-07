@@ -1,4 +1,15 @@
 {
-  "game_port": 8081,
-  "main_collection": "usr_data"
+  "game_port": 8082,
+  "main_collection": "usr_data",
+  "gateway_host": "127.0.0.1",
+  "gateway_port": 8080,
+  "gateway_register_path": "/register",
+  "gateway_heartbeat_path": "/heartbeat",
+  "report_ip": "127.0.0.1",
+  "server_id": "game-1",
+  "generator_id": 1,
+  "player_cache_ttl_sec": 600,
+  "player_flush_interval_sec": 5,
+  "data_dir": ".",
+  "cheat_mode_on" : 1
 }

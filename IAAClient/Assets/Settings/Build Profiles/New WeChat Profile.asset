@@ -34,16 +34,16 @@ MonoBehaviour:
         ProjectConf:
           projectName: WKRs Minigame Test
           Appid: wx735dd8b2e0fda8fe
-          CDN: 
-          assetLoadType: 1
-          compressDataPackage: 0
-          VideoUrl: 
+          CDN: https://cdn2.chillyroom.com/gameConfig/LifeWinner/2026-03-12/UpGRwlNg/
+          assetLoadType: 0
+          compressDataPackage: 1
+          VideoUrl: https://cdn2.chillyroom.com/gameConfig/LifeWinner/2026-03-12/UpGRwlNg/
           relativeDST: D:/builds
-          DST: D:\IAAProj\IAAClient\
+          DST: D:/builds
           StreamCDN: 
           bundleHashLength: 32
           bundlePathIdentifier: StreamingAssets;
-          bundleExcludeExtensions: json;
+          bundleExcludeExtensions: 
           AssetsUrl: 
           MemorySize: 256
           HideAfterCallMain: 1
@@ -142,6 +142,6 @@ MonoBehaviour:
         m_MiniGameTextureSubtarget: 0
         m_MiniGameFrameDebuggerBuild: 0
         m_MiniGameShowVConsole: 0
-        m_CodeOptimization: 4
-        m_MiniGameGenerateWasmAnalysisReport: 0
-        m_MiniGameWasmInlineParam: 200
+        m_CodeOptimization: 2
+        m_MiniGameGenerateWasmAnalysisReport: 1
+        m_MiniGameWasmInlineParam: 20

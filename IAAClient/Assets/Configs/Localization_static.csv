@@ -1,0 +1,6 @@
+﻿key,en_EN,zh_CN
+star,<sprite name=star_0>,<sprite name=star_0>
+next_energy_in,Regain next energy in {0},{0}后恢复一点体力
+time_min_second,"{0} min, {1} sec",{0}分{1}秒
+time_hour_minute,"{0} hour, {1} min",{0}小时{1}分
+time_day,{0} day,{0}天

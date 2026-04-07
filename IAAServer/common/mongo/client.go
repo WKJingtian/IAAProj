@@ -24,7 +24,6 @@ type Config struct {
 	AuthSource               string `json:"auth_source"`
 	AuthMechanism            string `json:"auth_mechanism"`
 	AppName                  string `json:"app_name"`
-	MainCollection           string "main_collection"
 	MaxPoolSize              uint64 `json:"max_pool_size"`
 	MinPoolSize              uint64 `json:"min_pool_size"`
 	MaxConnecting            uint64 `json:"max_connecting"`

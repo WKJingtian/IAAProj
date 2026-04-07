@@ -1,2 +1,6 @@
 *.exe
 .gocache/*
+linux_build/
+linux_runtime/
+k8s/.rendered/
+.gocache/

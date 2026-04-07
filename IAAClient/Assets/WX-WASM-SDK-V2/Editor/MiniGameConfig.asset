@@ -14,17 +14,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ProjectConf:
     projectName: WKRs Minigame Test
-    Appid: wx735dd8b2e0fda8fe
-    CDN: 
+    Appid: wx5cb84ac8c2524663
+    CDN: https://cdn2.chillyroom.com/gameConfig/LifeWinner/2026-04-02/ntNy_Ncs
     assetLoadType: 1
-    compressDataPackage: 0
+    compressDataPackage: 1
     VideoUrl: 
     relativeDST: D:/builds
     DST: D:/builds
     StreamCDN: 
     bundleHashLength: 32
     bundlePathIdentifier: StreamingAssets;
-    bundleExcludeExtensions: json;
+    bundleExcludeExtensions: 
     AssetsUrl: 
     MemorySize: 256
     HideAfterCallMain: 1
@@ -52,11 +52,11 @@ MonoBehaviour:
     AutoProfile: 0
     ScriptOnly: 0
     Il2CppOptimizeSize: 1
-    profilingFuncs: 1
+    profilingFuncs: 0
     Webgl2: 0
     fbslim: 0
     DeleteStreamingAssets: 1
-    ProfilingMemory: 0
+    ProfilingMemory: 1
     CleanBuild: 0
     CustomNodePath: 
     autoAdaptScreen: 0
@@ -79,7 +79,9 @@ MonoBehaviour:
     dstMinDir: 
     debugMode: 0
     force: 0
-  PlayerPrefsKeys: []
+  PlayerPrefsKeys:
+  - auth_session.openid
+  - auth_session.token
   FontOptions:
     CJK_Unified_Ideographs: 1
     C0_Controls_and_Basic_Latin: 1

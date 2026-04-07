@@ -1,11 +1,12 @@
 {
-  "gateway_port": 80,
-  "login_host": "127.0.0.1",
-  "login_port": 8080,
-  "game_host": "127.0.0.1",
-  "game_port": 8081,
+  "gateway_port": 8080,
   "jwt_secret": "2wEmusTKi1LA11JewS0",
   "proxy_timeout_ms": 10000,
   "login_route_path": "/login",
-  "login_target_path": "/wxlogin"
+  "login_target_path": "/wxlogin",
+  "register_path": "/register",
+  "heartbeat_path": "/heartbeat",
+  "lease_timeout_sec": 10,
+  "supersede_delay_sec": 30,
+  "game_sticky_ttl_sec": 100
 }
